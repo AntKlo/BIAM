@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <typeinfo>
+#include <ctime>
 
 using namespace std;
 
@@ -208,8 +209,29 @@ public:
 
 class Algorithm
 {
+public:
+    int* getRandomSolution(int* best_solution, int n, Solution solution, double** distances, int numCities, double min_cost, time_t start_time, int time_limit)
+    {
 
-    
+        int* new_solution = solution.getInitialSolution(new_solution, n);
+        double new_cost = solution.getCost(new_solution, distances, numCities);
+
+        while ((time(0) - start_time) < time_limit)
+        {
+            // if the new solution is better than the current solution
+            if (new_cost < min_cost)
+            {
+                int* best_solution = new_solution;
+                cout << "New best solution found: " << new_cost << endl;
+                return getRandomSolution(best_solution, n, solution, distances, numCities, new_cost, start_time, time_limit);
+            }
+            else
+            {
+                return getRandomSolution(best_solution, n, solution, distances, numCities, min_cost, start_time, time_limit);
+            }
+        }
+        return best_solution;
+    }    
 };
 
 
@@ -241,6 +263,23 @@ int main()
 
     cout << endl;
     cout << cost << endl;
+
+    cout << "Random Solution" << endl;
+    Algorithm algorithm;
+    time_t start_time = time(0);
+    int time_limit = 3;
+    double min_cost = cost;
+    int* best_solution;
+    best_solution = algorithm.getRandomSolution(sol, numCities, solution, distances, numCities, min_cost, start_time, time_limit);
+    // print best solution
+    for (int i = 0; i < numCities; i++)
+    {
+        cout << best_solution[i] << " ";
+    }
+    cout << endl;
+    cout << solution.getCost(best_solution, distances, numCities) << endl;
+
+
     // free the dynamically allocated memory
     for(int i=0; i<=numCities; i++)
     {
