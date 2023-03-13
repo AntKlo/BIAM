@@ -9,14 +9,13 @@
 
 using namespace std;
 
-
 class Problem
 {
 public:
+    // function to get the number of cities
     int getNumCities(string fileName)
     {
         int numCities = 0;
-        //double **cities;
         ifstream file(fileName);
         string str;
 
@@ -34,6 +33,7 @@ public:
         }
     }
 
+    // function to get the type of the problem
     string getType(string fileName)
     {
         string type;
@@ -53,10 +53,11 @@ public:
         }
     }
 
-    double** readFromFile(string fileName, double** cities)
+    // function to read the file and store the coordinates of the cities
+    double **readFromFile(string fileName, double **cities)
     {
         int numCities = 0;
-        //double **cities;
+        // double **cities;
         ifstream file(fileName);
         string str;
 
@@ -72,14 +73,14 @@ public:
             }
 
             // create 2d array to store the coordinates of the cities
-            cities = new double*[numCities]; // dynamically allocate memory for the array
+            cities = new double *[numCities];
 
-            for(int i=0; i<numCities; i++)
+            for (int i = 0; i < numCities; i++)
             {
                 cities[i] = new double[2];
             }
 
-            // str is "NODE_COORD_SECTION"
+            // if str is "NODE_COORD_SECTION"
             if (str.rfind("NODE_COORD_SECTION", 0) == 0)
             {
                 // read the coordinates of the cities
@@ -107,39 +108,33 @@ public:
     }
 };
 
-
 class Solution
 {
 public:
-    // function to randomize vector
-    int* getInitialSolution(int* arr, int n)
+    // function to generate a random solution
+    int *getRandomSolution(int *arr, int size)
     {
-        arr = new int[n];
-        for (int i = 0; i < n; i++)
+        // Seed the random number generator
+        srand(time(NULL));
+
+        // Iterate through the array starting from the last element
+        for (int i = size - 1; i > 0; i--)
         {
-            arr[i] = i;
-        }
-        // Start from the last element and swap
-        // one by one. We don't need to run for
-        // the first element that's why i > 0
-        for (int i = n - 1; i > 0; i--)
-        {
-            // Pick a random index from 0 to i
+            // Generate a random index between 0 and i (inclusive)
             int j = rand() % (i + 1);
 
-            // Swap arr[i] with the element
-            // at random index
-            arr[j] = arr[i] + arr[j];
-            arr[i] = arr[j] - arr[i];
-            arr[j] = arr[j] - arr[i];
+            // Swap the current element with a random element before it
+            int temp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = temp;
         }
         return arr;
     }
 
     // function to calculate euclidean distance between two points
-    double** euclideanDistance(double** cities, double** distances, int numCities)
+    double **euclideanDistance(double **cities, double **distances, int numCities)
     {
-        distances = new double*[numCities];
+        distances = new double *[numCities];
         for (int i = 0; i < numCities; i++)
         {
             distances[i] = new double[numCities];
@@ -157,9 +152,9 @@ public:
     }
 
     // function to calculate geo distance between two points
-    double** geoDistance(double** cities, double** distances, int numCities)
+    double **geoDistance(double **cities, double **distances, int numCities)
     {
-        distances = new double*[numCities];
+        distances = new double *[numCities];
         for (int i = 0; i < numCities; i++)
         {
             distances[i] = new double[numCities];
@@ -175,8 +170,8 @@ public:
         }
         return distances;
     }
-    // function that calculates euclidean distance between two points
-    double** calculateDistance(double** cities, double** distances, int numCities, string type)
+    // function to calculate distance between two points
+    double **calculateDistance(double **cities, double **distances, int numCities, string type)
     {
         if (type == "EUC_2D")
         {
@@ -194,7 +189,7 @@ public:
     }
 
     // function to calculate the cost of a solution
-    double getCost(int* sol, double** distances, int numCities)
+    double getCost(int *sol, double **distances, int numCities)
     {
         double cost = 0;
         for (int i = 0; i < numCities - 1; i++)
@@ -206,71 +201,61 @@ public:
     }
 };
 
-
 class Algorithm
 {
 public:
-    int* getRandomSolution(int* best_solution, int n, Solution solution, double** distances, int numCities, double min_cost, time_t start_time, int time_limit)
+    // random search algorithm
+    int *randomAlgorithm(int *best_solution, Solution solution, double **distances, int numCities, double min_cost, time_t start_time, int time_limit)
     {
-
-        int* new_solution = solution.getInitialSolution(new_solution, n);
-        double new_cost = solution.getCost(new_solution, distances, numCities);
-
-        while ((time(0) - start_time) < time_limit)
+        do
         {
-            // if the new solution is better than the current solution
+            int *new_solution = solution.getRandomSolution(best_solution, numCities);
+            double new_cost = solution.getCost(new_solution, distances, numCities);
             if (new_cost < min_cost)
             {
-                int* best_solution = new_solution;
-                cout << "New best solution found: " << new_cost << endl;
-                return getRandomSolution(best_solution, n, solution, distances, numCities, new_cost, start_time, time_limit);
+                min_cost = new_cost;
+                best_solution = new_solution;
             }
-            else
-            {
-                return getRandomSolution(best_solution, n, solution, distances, numCities, min_cost, start_time, time_limit);
-            }
-        }
-        return best_solution;
-    }    
-};
+        } while ((time(NULL) - start_time) < time_limit);
 
+        return best_solution;
+    }
+    // random walk algorithm
+    // TODO
+};
 
 int main()
 {
-    string fileName = "tsp_instances/kroA100.tsp";
+    string fileName = "tsp_instances/kroA100.tsp"; // state file name
     Problem problem;
-    double** cities;
-    double** distances;
-    int numCities = problem.getNumCities(fileName);
-    string type = problem.getType(fileName);
-    cout << numCities << endl;
-    cout << type << endl;
-    cities = problem.readFromFile(fileName, cities);
+    double **cities;
+    double **distances;
+    int numCities = problem.getNumCities(fileName); // get number of cities
+    string type = problem.getType(fileName);        // get type of distance
+    cout << "Number of cities:" << numCities << endl;
+    cout << "Type of distance:" << type << endl;
+    cities = problem.readFromFile(fileName, cities); // read cities from file
 
     Solution solution;
-    distances = solution.calculateDistance(cities, distances, numCities, type);
-    
-    
-    int *sol;
-    
-    sol = solution.getInitialSolution(sol, numCities);
-    double cost = solution.getCost(sol, distances, numCities);
+    distances = solution.calculateDistance(cities, distances, numCities, type); // calculate distance between cities
 
+    int *sol = new int[numCities];
     for (int i = 0; i < numCities; i++)
     {
-        cout << sol[i] << " ";
+        sol[i] = i;
     }
+    sol = solution.getRandomSolution(sol, numCities); // get initial solution
 
-    cout << endl;
-    cout << cost << endl;
+    double cost = solution.getCost(sol, distances, numCities); // get cost of initial solution
 
-    cout << "Random Solution" << endl;
     Algorithm algorithm;
-    time_t start_time = time(0);
-    int time_limit = 3;
-    double min_cost = cost;
-    int* best_solution;
-    best_solution = algorithm.getRandomSolution(sol, numCities, solution, distances, numCities, min_cost, start_time, time_limit);
+    cout << endl
+         << "Random Solution" << endl;
+    double min_cost = cost; // cost of initial solution
+    int *best_solution;
+    int time_limit = 3; // time limit in seconds
+    time_t start_time = time(NULL);
+    best_solution = algorithm.randomAlgorithm(sol, solution, distances, numCities, min_cost, start_time, time_limit);
     // print best solution
     for (int i = 0; i < numCities; i++)
     {
@@ -279,9 +264,8 @@ int main()
     cout << endl;
     cout << solution.getCost(best_solution, distances, numCities) << endl;
 
-
     // free the dynamically allocated memory
-    for(int i=0; i<=numCities; i++)
+    for (int i = 0; i <= numCities; i++)
     {
         delete[] cities[i];
         delete[] distances[i];
@@ -289,6 +273,7 @@ int main()
     delete[] cities;
     delete[] distances;
     delete[] sol;
+    delete[] best_solution;
 
     return 0;
 }
