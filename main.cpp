@@ -6,6 +6,8 @@
 #include <ctime>
 #include <typeinfo>
 #include <ctime>
+#include <chrono>
+#include <limits>
 
 using namespace std;
 
@@ -207,8 +209,10 @@ public:
     // random search algorithm
     int *randomAlgorithm(int *best_solution, Solution solution, double **distances, int numCities, double min_cost, time_t start_time, int time_limit)
     {
+        int iter_number = 0;
         do
         {
+            iter_number++;
             int *new_solution = solution.getRandomSolution(best_solution, numCities);
             double new_cost = solution.getCost(new_solution, distances, numCities);
             if (new_cost < min_cost)
@@ -218,14 +222,86 @@ public:
             }
         } while ((time(NULL) - start_time) < time_limit);
 
+        cout << "Number of iterations: " << iter_number << endl;
+
         return best_solution;
     }
     // random walk algorithm
-    // TODO
+    int *randomWalkAlgorithm(int *best_solution, Solution solution, double **distances, int numCities, double min_cost, time_t start_time, int time_limit)
+    {
+        int iter_number = 0;
+        do
+        {
+            iter_number++;
+            // shuffle random part of the solution
+            int start = rand() % numCities;
+            int end = start + rand() % (numCities - start);
+
+            // copy the best solution to a new solution
+            int *new_solution = new int[numCities];
+            for (int i = 0; i < numCities; i++)
+            {
+                new_solution[i] = best_solution[i];
+            }
+
+            // shuffle the array between start and end
+            for (int i = start; i < end; i++)
+            {
+                int j = rand() % (end - start) + start;
+                int temp = new_solution[i];
+                new_solution[i] = new_solution[j];
+                new_solution[j] = temp;
+            }
+
+            double new_cost = solution.getCost(new_solution, distances, numCities);
+            if (new_cost < min_cost)
+            {
+                min_cost = new_cost;
+                best_solution = new_solution;
+            }
+        } while ((time(NULL) - start_time) < time_limit);
+
+        cout << "Number of iterations:" << iter_number << endl;
+
+        return best_solution;
+    }
+
+    // nearest neighbor algorithm
+    int *nearestNeighborAlgorithm(int *best_solution, double **distances, int numCities)
+    {
+        auto start_time = chrono::high_resolution_clock::now();
+        int *new_solution = new int[numCities];
+        new_solution[0] = best_solution[0];
+        int *visited = new int[numCities];
+        for (int i = 0; i < numCities; i++)
+        {
+            visited[i] = 0;
+        }
+        visited[best_solution[0]] = 1;
+        for (int i = 1; i < numCities; i++)
+        {
+            double min_dist = numeric_limits<double>::infinity();;
+            int min_index = 0;
+            for (int j = 0; j < numCities; j++)
+            {
+                if (visited[j] == 0 && distances[new_solution[i - 1]][j] < min_dist)
+                {
+                    min_dist = distances[new_solution[i - 1]][j];
+                    min_index = j;
+                }
+            }
+            new_solution[i] = min_index;
+            visited[min_index] = 1;
+        }
+        auto end_time = chrono::high_resolution_clock::now();
+        cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
+        return new_solution;
+    }
 };
 
 int main()
 {
+    // read data from file
     string fileName = "tsp_instances/kroA100.tsp"; // state file name
     Problem problem;
     double **cities;
@@ -236,6 +312,9 @@ int main()
     cout << "Type of distance:" << type << endl;
     cities = problem.readFromFile(fileName, cities); // read cities from file
 
+    // -----------------------------------------
+
+    // calculate all distances, get initial solution and its cost
     Solution solution;
     distances = solution.calculateDistance(cities, distances, numCities, type); // calculate distance between cities
 
@@ -244,13 +323,17 @@ int main()
     {
         sol[i] = i;
     }
-    sol = solution.getRandomSolution(sol, numCities); // get initial solution
-
+    sol = solution.getRandomSolution(sol, numCities);          // get initial solution
     double cost = solution.getCost(sol, distances, numCities); // get cost of initial solution
+    cout << "-----------------------------------------" << endl;
 
+    // -----------------------------------------
+
+    // perform different algorithms
     Algorithm algorithm;
+    // RANDOM
     cout << endl
-         << "Random Solution" << endl;
+         << "RANDOM" << endl;
     double min_cost = cost; // cost of initial solution
     int *best_solution;
     int time_limit = 3; // time limit in seconds
@@ -263,6 +346,38 @@ int main()
     }
     cout << endl;
     cout << solution.getCost(best_solution, distances, numCities) << endl;
+    cout << "-----------------------------------------" << endl;
+
+    // -----------------------------------------
+    // RANDOM WALK
+    cout << endl
+         << "RANDOM WALK" << endl;
+    min_cost = cost; // cost of initial solution
+    time_limit = 3;  // time limit in seconds
+    start_time = time(NULL);
+    best_solution = algorithm.randomWalkAlgorithm(sol, solution, distances, numCities, min_cost, start_time, time_limit);
+    // print best solution
+    for (int i = 0; i < numCities; i++)
+    {
+        cout << best_solution[i] << " ";
+    }
+    cout << endl;
+    cout << solution.getCost(best_solution, distances, numCities) << endl;
+    cout << "-----------------------------------------" << endl;
+
+    // -----------------------------------------
+    // NEAREST NEIGHBOR
+    cout << endl
+         << "NEAREST NEIGHBOR" << endl;
+    best_solution = algorithm.nearestNeighborAlgorithm(sol, distances, numCities);
+    // print best solution
+    for (int i = 0; i < numCities; i++)
+    {
+        cout << best_solution[i] << " ";
+    }
+    cout << endl;
+    cout << solution.getCost(best_solution, distances, numCities) << endl;
+    cout << "-----------------------------------------" << endl;
 
     // free the dynamically allocated memory
     for (int i = 0; i <= numCities; i++)
