@@ -4,6 +4,10 @@
         "ostream": "cpp",
         "string": "cpp",
         "iostream": "cpp",
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "algorithm": "cpp",
+        "limits": "cpp",
+        "utility": "cpp",
+        "fstream": "cpp"
     }
 }

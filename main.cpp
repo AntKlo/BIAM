@@ -11,6 +11,13 @@
 
 using namespace std;
 
+void swap(int *a, int *b)
+{
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
 class Problem
 {
 public:
@@ -261,48 +268,200 @@ public:
             }
         } while ((time(NULL) - start_time) < time_limit);
 
-        cout << "Number of iterations:" << iter_number << endl;
+        cout << "Number of iterations: " << iter_number << endl;
 
         return best_solution;
     }
 
     // nearest neighbor algorithm
-    int *nearestNeighborAlgorithm(int *best_solution, double **distances, int numCities)
+    int *nearestNeighborAlgorithm(int *initial_solution, double **distances, int numCities)
     {
         auto start_time = chrono::high_resolution_clock::now();
         int *new_solution = new int[numCities];
-        new_solution[0] = best_solution[0];
-        int *visited = new int[numCities];
+        new_solution[0] = initial_solution[0];
+        bool *visited = new bool[numCities];
         for (int i = 0; i < numCities; i++)
         {
-            visited[i] = 0;
+            visited[i] = false;
         }
-        visited[best_solution[0]] = 1;
+        visited[initial_solution[0]] = true;
         for (int i = 1; i < numCities; i++)
         {
-            double min_dist = numeric_limits<double>::infinity();;
+            double min_dist = numeric_limits<double>::infinity();
             int min_index = 0;
             for (int j = 0; j < numCities; j++)
             {
-                if (visited[j] == 0 && distances[new_solution[i - 1]][j] < min_dist)
+                if (visited[j] == false && distances[new_solution[i - 1]][j] < min_dist)
                 {
                     min_dist = distances[new_solution[i - 1]][j];
                     min_index = j;
                 }
             }
             new_solution[i] = min_index;
-            visited[min_index] = 1;
+            visited[min_index] = true;
         }
         auto end_time = chrono::high_resolution_clock::now();
         cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
+        delete[] visited;
         return new_solution;
+    }
+
+    // greedy algorithm
+    int *greedyAlgorithm(int *initial_solution, double **distances, int numCities)
+    {
+        Solution solution;
+        auto start_time = chrono::high_resolution_clock::now();
+        // local search
+        int *new_solution = new int[numCities];
+        for (int i = 0; i < numCities; i++)
+        {
+            new_solution[i] = initial_solution[i];
+        }
+
+        // greedy improvement
+        bool improved = true;
+        int iter_number = 0;
+        int solutions_visited = 0;
+        while (improved)
+        {
+            iter_number++;
+            improved = false;
+            for (int i = 1; i < numCities - 1; i++)
+            {
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    solutions_visited++;
+                    double delta = distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]];
+                    if (delta < 0)
+                    {
+                        int *temp_solution = new int[numCities];
+                        for (int i = 0; i < numCities; i++)
+                        {
+                            temp_solution[i] = new_solution[i];
+                        }
+
+                        // two_opt_swap(i, k);
+                        int m = i;
+                        int n = k;
+                        while (m < n)
+                        {
+                            int temp = temp_solution[m];
+                            temp_solution[m] = temp_solution[n];
+                            temp_solution[n] = temp;
+                            m++;
+                            n--;
+                        }
+                        if (solution.getCost(temp_solution, distances, numCities) < solution.getCost(new_solution, distances, numCities))
+                        {
+                            for (int i = 0; i < numCities; i++)
+                            {
+                                new_solution[i] = temp_solution[i];
+                            }
+                            improved = true;
+                        }
+                        if (improved)
+                        {
+                            break;
+                        }
+                    }
+                }
+                if (improved)
+                {
+                    break;
+                }
+            }
+        }
+        auto end_time = chrono::high_resolution_clock::now();
+        cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
+        cout << "Number of iterations: " << iter_number << endl;
+        cout << "Number of solutions visited: " << solutions_visited << endl;
+        return new_solution;
+    }
+
+    // steepest algorithm
+    int *steepestAlgorithm(int *initial_solution, double **distances, int numCities)
+    {
+        Solution solution;
+        auto start_time = chrono::high_resolution_clock::now();
+        // local search
+        int *best_solution = new int[numCities];
+        for (int i = 0; i < numCities; i++)
+        {
+            best_solution[i] = initial_solution[i];
+        }
+        int *current_solution = new int[numCities];
+        for (int i = 0; i < numCities; i++)
+        {
+            current_solution[i] = initial_solution[i];
+        }
+
+        bool improved = true;
+        int iter_number = 0;
+        int solutions_visited = 0;
+        while (improved)
+        {
+            improved = false;
+            iter_number++;
+            double best_delta = 0;
+            int best_i = -1;
+            int best_k = -1;
+
+            // iterate over all possible moves
+            for (int i = 1; i < numCities - 1; i++)
+            {
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    solutions_visited++;
+                    double delta = distances[current_solution[i - 1]][current_solution[k]] + distances[current_solution[i]][current_solution[k + 1]] - distances[current_solution[i - 1]][current_solution[i]] - distances[current_solution[k]][current_solution[k + 1]];
+                    if (delta < best_delta)
+                    {
+                        best_delta = delta;
+                        best_i = i;
+                        best_k = k;
+                    }
+                }
+            }
+
+            // apply the best move if it improves the solution
+            if (best_delta < 0)
+            {
+                int m = best_i;
+                int n = best_k;
+                while (m < n)
+                {
+                    int temp = current_solution[m];
+                    current_solution[m] = current_solution[n];
+                    current_solution[n] = temp;
+                    m++;
+                    n--;
+                }
+                improved = true;
+            }
+
+            // update the best solution if the current solution is better
+            double current_distance = solution.getCost(current_solution, distances, numCities);
+            double best_distance = solution.getCost(best_solution, distances, numCities);
+            if (current_distance < best_distance)
+            {
+                for (int i = 0; i < numCities; i++)
+                {
+                    best_solution[i] = current_solution[i];
+                }
+            }
+        }
+
+        auto end_time = chrono::high_resolution_clock::now();
+        cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
+        cout << "Number of iterations: " << iter_number << endl;
+        cout << "Number of solutions visited: " << solutions_visited << endl;
+        return best_solution;
     }
 };
 
 int main()
 {
     // read data from file
-    string fileName = "tsp_instances/kroA100.tsp"; // state file name
+    string fileName = "tsp_instances/pr76.tsp"; // state file name
     Problem problem;
     double **cities;
     double **distances;
@@ -336,7 +495,7 @@ int main()
          << "RANDOM" << endl;
     double min_cost = cost; // cost of initial solution
     int *best_solution;
-    int time_limit = 3; // time limit in seconds
+    int time_limit = 2; // time limit in seconds
     time_t start_time = time(NULL);
     best_solution = algorithm.randomAlgorithm(sol, solution, distances, numCities, min_cost, start_time, time_limit);
     // print best solution
@@ -345,7 +504,7 @@ int main()
         cout << best_solution[i] << " ";
     }
     cout << endl;
-    cout << solution.getCost(best_solution, distances, numCities) << endl;
+    cout << "Cost: " << solution.getCost(best_solution, distances, numCities) << endl;
     cout << "-----------------------------------------" << endl;
 
     // -----------------------------------------
@@ -362,7 +521,7 @@ int main()
         cout << best_solution[i] << " ";
     }
     cout << endl;
-    cout << solution.getCost(best_solution, distances, numCities) << endl;
+    cout << "Cost: " << solution.getCost(best_solution, distances, numCities) << endl;
     cout << "-----------------------------------------" << endl;
 
     // -----------------------------------------
@@ -376,7 +535,35 @@ int main()
         cout << best_solution[i] << " ";
     }
     cout << endl;
-    cout << solution.getCost(best_solution, distances, numCities) << endl;
+    cout << "Cost: " << solution.getCost(best_solution, distances, numCities) << endl;
+    cout << "-----------------------------------------" << endl;
+
+    // -----------------------------------------
+    // GREEDY
+    cout << endl
+         << "GREEDY" << endl;
+    best_solution = algorithm.greedyAlgorithm(sol, distances, numCities);
+    // print best solution
+    for (int i = 0; i < numCities; i++)
+    {
+        cout << best_solution[i] << " ";
+    }
+    cout << endl;
+    cout << "Cost: " << solution.getCost(best_solution, distances, numCities) << endl;
+    cout << "-----------------------------------------" << endl;
+
+    // -----------------------------------------
+    // STEEPEST
+    cout << endl
+         << "STEEPEST" << endl;
+    best_solution = algorithm.steepestAlgorithm(sol, distances, numCities);
+    // print best solution
+    for (int i = 0; i < numCities; i++)
+    {
+        cout << best_solution[i] << " ";
+    }
+    cout << endl;
+    cout << "Cost: " << solution.getCost(best_solution, distances, numCities) << endl;
     cout << "-----------------------------------------" << endl;
 
     // free the dynamically allocated memory
