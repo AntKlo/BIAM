@@ -1,3 +1,6 @@
+# Files with saved solutions and costs
+*.txt
+
 # Prerequisites
 *.d
 

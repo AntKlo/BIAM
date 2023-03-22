@@ -208,6 +208,23 @@ public:
         cost += distances[sol[numCities - 1]][sol[0]];
         return cost;
     }
+
+    // function to save 10 solutions from array and their costs to a file
+    void saveToFile(string fileName, int **solutions, double *costs, int numCities)
+    {
+        ofstream file;
+        file.open(fileName);
+        for (int i = 0; i < 10; i++)
+        {
+            for (int j = 0; j < numCities; j++)
+            {
+                file << solutions[i][j] << " ";
+            }
+            file << endl;
+            file << costs[i] << endl;
+        }
+        file.close();
+    }
 };
 
 class Algorithm
@@ -274,17 +291,17 @@ public:
     }
 
     // nearest neighbor algorithm
-    int *nearestNeighborAlgorithm(int *initial_solution, double **distances, int numCities)
+    int *nearestNeighborAlgorithm(double **distances, int numCities)
     {
         auto start_time = chrono::high_resolution_clock::now();
         int *new_solution = new int[numCities];
-        new_solution[0] = initial_solution[0];
+        new_solution[0] = rand() % numCities;
         bool *visited = new bool[numCities];
         for (int i = 0; i < numCities; i++)
         {
             visited[i] = false;
         }
-        visited[initial_solution[0]] = true;
+        visited[new_solution[0]] = true;
         for (int i = 1; i < numCities; i++)
         {
             double min_dist = numeric_limits<double>::infinity();
@@ -301,7 +318,7 @@ public:
             visited[min_index] = true;
         }
         auto end_time = chrono::high_resolution_clock::now();
-        cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
+        // cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
         delete[] visited;
         return new_solution;
     }
@@ -372,9 +389,9 @@ public:
             }
         }
         auto end_time = chrono::high_resolution_clock::now();
-        cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
-        cout << "Number of iterations: " << iter_number << endl;
-        cout << "Number of solutions visited: " << solutions_visited << endl;
+        // cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
+        // cout << "Number of iterations: " << iter_number << endl;
+        // cout << "Number of solutions visited: " << solutions_visited << endl;
         return new_solution;
     }
 
@@ -451,9 +468,9 @@ public:
         }
 
         auto end_time = chrono::high_resolution_clock::now();
-        cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
-        cout << "Number of iterations: " << iter_number << endl;
-        cout << "Number of solutions visited: " << solutions_visited << endl;
+        // cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
+        // cout << "Number of iterations: " << iter_number << endl;
+        // cout << "Number of solutions visited: " << solutions_visited << endl;
         return best_solution;
     }
 };
@@ -493,11 +510,10 @@ int main()
     // RANDOM
     cout << endl
          << "RANDOM" << endl;
-    double min_cost = cost; // cost of initial solution
     int *best_solution;
     int time_limit = 2; // time limit in seconds
     time_t start_time = time(NULL);
-    best_solution = algorithm.randomAlgorithm(sol, solution, distances, numCities, min_cost, start_time, time_limit);
+    best_solution = algorithm.randomAlgorithm(sol, solution, distances, numCities, cost, start_time, time_limit);
     // print best solution
     for (int i = 0; i < numCities; i++)
     {
@@ -511,10 +527,9 @@ int main()
     // RANDOM WALK
     cout << endl
          << "RANDOM WALK" << endl;
-    min_cost = cost; // cost of initial solution
-    time_limit = 3;  // time limit in seconds
+    time_limit = 3; // time limit in seconds
     start_time = time(NULL);
-    best_solution = algorithm.randomWalkAlgorithm(sol, solution, distances, numCities, min_cost, start_time, time_limit);
+    best_solution = algorithm.randomWalkAlgorithm(sol, solution, distances, numCities, cost, start_time, time_limit);
     // print best solution
     for (int i = 0; i < numCities; i++)
     {
@@ -528,42 +543,121 @@ int main()
     // NEAREST NEIGHBOR
     cout << endl
          << "NEAREST NEIGHBOR" << endl;
-    best_solution = algorithm.nearestNeighborAlgorithm(sol, distances, numCities);
-    // print best solution
-    for (int i = 0; i < numCities; i++)
+    // array for best solutions
+    int **nn_solutions = new int *[10];
+    for (int i = 0; i < 10; i++)
     {
-        cout << best_solution[i] << " ";
+        nn_solutions[i] = new int[numCities];
     }
+    // array for costs of best solutions
+    double *nn_costs = new double[10];
+    // perform nearest neighbor algorithm 10 times
+    for (int i = 0; i < 10; i++)
+    {
+        nn_solutions[i] = algorithm.nearestNeighborAlgorithm(distances, numCities);
+        nn_costs[i] = solution.getCost(nn_solutions[i], distances, numCities);
+    }
+    // print average, min and max cost
+    double avg_cost = 0;
+    double min_cost = nn_costs[0];
+    double max_cost = nn_costs[0];
+    for (int i = 0; i < 10; i++)
+    {
+        avg_cost += nn_costs[i];
+        if (nn_costs[i] < min_cost)
+        {
+            min_cost = nn_costs[i];
+        }
+        if (nn_costs[i] > max_cost)
+        {
+            max_cost = nn_costs[i];
+        }
+    }
+    // save to file
+    solution.saveToFile("nn_solutions.txt", nn_solutions, nn_costs, numCities);
+    
     cout << endl;
-    cout << "Cost: " << solution.getCost(best_solution, distances, numCities) << endl;
     cout << "-----------------------------------------" << endl;
 
     // -----------------------------------------
     // GREEDY
     cout << endl
          << "GREEDY" << endl;
-    best_solution = algorithm.greedyAlgorithm(sol, distances, numCities);
-    // print best solution
-    for (int i = 0; i < numCities; i++)
+    // array for best solutions
+    int **greedy_solutions = new int *[10];
+    for (int i = 0; i < 10; i++)
     {
-        cout << best_solution[i] << " ";
+        greedy_solutions[i] = new int[numCities];
     }
+    // array for costs of best solutions
+    double *greedy_costs = new double[10];
+    // perform greedy algorithm 10 times
+    for (int i = 0; i < 10; i++)
+    {
+        sol = solution.getRandomSolution(sol, numCities);
+        greedy_solutions[i] = algorithm.greedyAlgorithm(sol, distances, numCities);
+        greedy_costs[i] = solution.getCost(greedy_solutions[i], distances, numCities);
+    }
+    // print average, min and max cost
+    avg_cost = 0;
+    min_cost = greedy_costs[0];
+    max_cost = greedy_costs[0];
+    for (int i = 0; i < 10; i++)
+    {
+        avg_cost += greedy_costs[i];
+        if (greedy_costs[i] < min_cost)
+        {
+            min_cost = greedy_costs[i];
+        }
+        if (greedy_costs[i] > max_cost)
+        {
+            max_cost = greedy_costs[i];
+        }
+    }
+    // save to file
+    solution.saveToFile("greedy_solutions.txt", greedy_solutions, greedy_costs, numCities);
     cout << endl;
-    cout << "Cost: " << solution.getCost(best_solution, distances, numCities) << endl;
     cout << "-----------------------------------------" << endl;
 
     // -----------------------------------------
     // STEEPEST
     cout << endl
          << "STEEPEST" << endl;
-    best_solution = algorithm.steepestAlgorithm(sol, distances, numCities);
-    // print best solution
-    for (int i = 0; i < numCities; i++)
+    // array for best solutions
+    int **steepest_solutions = new int *[10];
+    for (int i = 0; i < 10; i++)
     {
-        cout << best_solution[i] << " ";
+        steepest_solutions[i] = new int[numCities];
     }
+    // array for costs of best solutions
+    double *steepest_costs = new double[10];
+
+    // perform steepest algorithm 10 times
+    for (int i = 0; i < 10; i++)
+    {
+        sol = solution.getRandomSolution(sol, numCities);
+        steepest_solutions[i] = algorithm.steepestAlgorithm(sol, distances, numCities);
+        steepest_costs[i] = solution.getCost(steepest_solutions[i], distances, numCities);
+    }
+    // print average, min and max cost
+    avg_cost = 0;
+    min_cost = steepest_costs[0];
+    max_cost = steepest_costs[0];
+    for (int i = 0; i < 10; i++)
+    {
+        avg_cost += steepest_costs[i];
+        if (steepest_costs[i] < min_cost)
+        {
+            min_cost = steepest_costs[i];
+        }
+        if (steepest_costs[i] > max_cost)
+        {
+            max_cost = steepest_costs[i];
+        }
+    }
+    // save to file
+    solution.saveToFile("steepest_solutions.txt", steepest_solutions, steepest_costs, numCities);
     cout << endl;
-    cout << "Cost: " << solution.getCost(best_solution, distances, numCities) << endl;
     cout << "-----------------------------------------" << endl;
 
     // free the dynamically allocated memory
