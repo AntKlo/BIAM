@@ -18,6 +18,26 @@ void swap(int *a, int *b)
     *b = temp;
 }
 
+void inverse_order_of_subarray(int *curr_solution, int i, int k)
+{
+    while (i < k)
+    {
+        int temp = curr_solution[i];
+        curr_solution[i] = curr_solution[k];
+        curr_solution[k] = temp;
+        i++;
+        k--;
+    }
+}
+
+void copy_array(int *to_set_arr, int *to_cp_arr, int size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        to_set_arr[i] = to_cp_arr[i];
+    }
+}
+
 class Problem
 {
 public:
@@ -326,16 +346,11 @@ public:
     }
 
     // greedy algorithm
-    int *greedyAlgorithm(int *initial_solution, double **distances, int numCities)
+    void greedyAlgorithm(int *initial_solution, int *new_solution, double **distances, int numCities)
     {
         Solution solution;
         auto start_time = chrono::high_resolution_clock::now();
-        // local search
-        int *new_solution = new int[numCities];
-        for (int i = 0; i < numCities; i++)
-        {
-            new_solution[i] = initial_solution[i];
-        }
+        copy_array(new_solution, initial_solution, numCities);
 
         // greedy improvement
         bool improved = true;
@@ -353,35 +368,9 @@ public:
                     double delta = distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]];
                     if (delta < 0)
                     {
-                        int *temp_solution = new int[numCities];
-                        for (int i = 0; i < numCities; i++)
-                        {
-                            temp_solution[i] = new_solution[i];
-                        }
-
-                        // two_opt_swap(i, k);
-                        int m = i;
-                        int n = k;
-                        while (m < n)
-                        {
-                            int temp = temp_solution[m];
-                            temp_solution[m] = temp_solution[n];
-                            temp_solution[n] = temp;
-                            m++;
-                            n--;
-                        }
-                        if (solution.getCost(temp_solution, distances, numCities) < solution.getCost(new_solution, distances, numCities))
-                        {
-                            for (int i = 0; i < numCities; i++)
-                            {
-                                new_solution[i] = temp_solution[i];
-                            }
-                            improved = true;
-                        }
-                        if (improved)
-                        {
-                            break;
-                        }
+                        inverse_order_of_subarray(new_solution, i, k);
+                        improved = true;
+                        break;
                     }
                 }
                 if (improved)
@@ -394,25 +383,14 @@ public:
         // cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
         // cout << "Number of iterations: " << iter_number << endl;
         // cout << "Number of solutions visited: " << solutions_visited << endl;
-        return new_solution;
     }
 
-    // steepest algorithm
-    int *steepestAlgorithm(int *initial_solution, double **distances, int numCities)
+
+    void steepestAlgorithm(int *initial_solution, int *new_solution, double **distances, int numCities)
     {
         Solution solution;
         auto start_time = chrono::high_resolution_clock::now();
-        // local search
-        int *best_solution = new int[numCities];
-        for (int i = 0; i < numCities; i++)
-        {
-            best_solution[i] = initial_solution[i];
-        }
-        int *current_solution = new int[numCities];
-        for (int i = 0; i < numCities; i++)
-        {
-            current_solution[i] = initial_solution[i];
-        }
+        copy_array(new_solution, initial_solution, numCities);
 
         bool improved = true;
         int iter_number = 0;
@@ -424,14 +402,13 @@ public:
             double best_delta = 0;
             int best_i = -1;
             int best_k = -1;
-
             // iterate over all possible moves
             for (int i = 1; i < numCities - 1; i++)
             {
                 for (int k = i + 1; k < numCities - 1; k++)
                 {
                     solutions_visited++;
-                    double delta = distances[current_solution[i - 1]][current_solution[k]] + distances[current_solution[i]][current_solution[k + 1]] - distances[current_solution[i - 1]][current_solution[i]] - distances[current_solution[k]][current_solution[k + 1]];
+                    double delta = distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]];
                     if (delta < best_delta)
                     {
                         best_delta = delta;
@@ -444,28 +421,7 @@ public:
             // apply the best move if it improves the solution
             if (best_delta < 0)
             {
-                int m = best_i;
-                int n = best_k;
-                while (m < n)
-                {
-                    int temp = current_solution[m];
-                    current_solution[m] = current_solution[n];
-                    current_solution[n] = temp;
-                    m++;
-                    n--;
-                }
-                improved = true;
-            }
-
-            // update the best solution if the current solution is better
-            double current_distance = solution.getCost(current_solution, distances, numCities);
-            double best_distance = solution.getCost(best_solution, distances, numCities);
-            if (current_distance < best_distance)
-            {
-                for (int i = 0; i < numCities; i++)
-                {
-                    best_solution[i] = current_solution[i];
-                }
+                inverse_order_of_subarray(new_solution, best_i, best_k);
             }
         }
 
@@ -473,7 +429,6 @@ public:
         // cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
         // cout << "Number of iterations: " << iter_number << endl;
         // cout << "Number of solutions visited: " << solutions_visited << endl;
-        return best_solution;
     }
 };
 
@@ -509,6 +464,8 @@ int main()
 
     // perform different algorithms
     Algorithm algorithm;
+    int *new_solution = new int[numCities];
+    int *tmp_solution = new int[numCities];
     // RANDOM
     cout << endl
          << "RANDOM" << endl;
@@ -529,7 +486,7 @@ int main()
         random_costs[i] = solution.getCost(random_solutions[i], distances, numCities);
     }
     // save to file
-    solution.saveToFile("random_pr76.txt", random_solutions, random_costs, numCities);
+    solution.saveToFile("solution_random_pr76.txt", random_solutions, random_costs, numCities);
     delete[] random_solutions;
     delete[] random_costs;
     cout << endl;
@@ -555,7 +512,7 @@ int main()
         rw_costs[i] = solution.getCost(rw_solutions[i], distances, numCities);
     }
     // save to file
-    solution.saveToFile("random_walk_pr76.txt", rw_solutions, rw_costs, numCities);
+    solution.saveToFile("solution_random_walk_pr76.txt", rw_solutions, rw_costs, numCities);
     delete[] rw_solutions;
     delete[] rw_costs;
     cout << endl;
@@ -580,7 +537,7 @@ int main()
         nn_costs[i] = solution.getCost(nn_solutions[i], distances, numCities);
     }
     // save to file
-    solution.saveToFile("nn_pr76.txt", nn_solutions, nn_costs, numCities);
+    solution.saveToFile("solution_nn_pr76.txt", nn_solutions, nn_costs, numCities);
     delete[] nn_solutions;
     delete[] nn_costs;
     cout << endl;
@@ -602,11 +559,12 @@ int main()
     for (int i = 0; i < 10; i++)
     {
         sol = solution.getRandomSolution(sol, numCities);
-        greedy_solutions[i] = algorithm.greedyAlgorithm(sol, distances, numCities);
+        algorithm.greedyAlgorithm(sol, new_solution, distances, numCities);
+        copy_array(greedy_solutions[i], new_solution, numCities);
         greedy_costs[i] = solution.getCost(greedy_solutions[i], distances, numCities);
     }
     // save to file
-    solution.saveToFile("greedy_pr76.txt", greedy_solutions, greedy_costs, numCities);
+    solution.saveToFile("solution_greedy_pr76.txt", greedy_solutions, greedy_costs, numCities);
     delete[] greedy_solutions;
     delete[] greedy_costs;
     cout << endl;
@@ -629,11 +587,12 @@ int main()
     for (int i = 0; i < 10; i++)
     {
         sol = solution.getRandomSolution(sol, numCities);
-        steepest_solutions[i] = algorithm.steepestAlgorithm(sol, distances, numCities);
+        algorithm.steepestAlgorithm(sol, new_solution, distances, numCities);
+        steepest_solutions[i] = new_solution;
         steepest_costs[i] = solution.getCost(steepest_solutions[i], distances, numCities);
     }
     // save to file
-    solution.saveToFile("steepest_pr76.txt", steepest_solutions, steepest_costs, numCities);
+    solution.saveToFile("solution_steepest_pr76.txt", steepest_solutions, steepest_costs, numCities);
     delete[] steepest_solutions;
     delete[] steepest_costs;
     cout << endl;
@@ -643,10 +602,12 @@ int main()
     for (int i = 0; i <= numCities; i++)
     {
         delete[] cities[i];
-        delete[] distances[i];
+        delete[] distances[i];  // in my case Exception has occurred Segmentation fault -> just comment for now to make it work.
     }
     delete[] cities;
     delete[] distances;
     delete[] sol;
+    delete[] new_solution;
+    delete[] tmp_solution;
     return 0;
 }
