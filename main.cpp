@@ -38,6 +38,28 @@ void copy_array(int *to_set_arr, int *to_cp_arr, int size)
     }
 }
 
+void print_avg_min_max_cost(double *costs, int size)
+{
+    int min = numeric_limits<int>::max();
+    int max = numeric_limits<int>::min();
+    int sum = 0;
+    for (int i = 0; i < size; i++)
+    {
+        if (costs[i] < min)
+        {
+            min = costs[i];
+        }
+        if (costs[i] > max)
+        {
+            max = costs[i];
+        }
+        sum += costs[i];
+    }
+    cout << "Average cost: " << sum / size << endl;
+    cout << "Minimum cost: " << min << endl;
+    cout << "Maximum cost: " << max << endl;
+}
+
 class Problem
 {
 public:
@@ -60,6 +82,7 @@ public:
                 return numCities;
             }
         }
+        return numCities;
     }
 
     // function to get the type of the problem
@@ -80,6 +103,7 @@ public:
                 return type;
             }
         }
+        return type;
     }
 
     // function to read the file and store the coordinates of the cities
@@ -134,6 +158,7 @@ public:
                 return cities;
             }
         }
+        return cities;
     }
 };
 
@@ -160,7 +185,7 @@ public:
         return arr;
     }
 
-    // function to calculate euclidean distance between two points
+    // function to calculate euclidean distances between cities
     double **euclideanDistance(double **cities, double **distances, int numCities)
     {
         distances = new double *[numCities];
@@ -180,35 +205,12 @@ public:
         return distances;
     }
 
-    // function to calculate geo distance between two points
-    double **geoDistance(double **cities, double **distances, int numCities)
-    {
-        distances = new double *[numCities];
-        for (int i = 0; i < numCities; i++)
-        {
-            distances[i] = new double[numCities];
-            for (int j = 0; j < numCities; j++)
-            {
-                double x1 = cities[i][0];
-                double y1 = cities[i][1];
-                double x2 = cities[j][0];
-                double y2 = cities[j][1];
-                double distance = acos(sin(x1) * sin(x2) + cos(x1) * cos(x2) * cos(y2 - y1)) * 6378.388;
-                distances[i][j] = distance;
-            }
-        }
-        return distances;
-    }
-    // function to calculate distance between two points
+    // function to calculate distances between cities based on type
     double **calculateDistance(double **cities, double **distances, int numCities, string type)
     {
         if (type == "EUC_2D")
         {
             distances = euclideanDistance(cities, distances, numCities);
-        }
-        else if (type == "GEO")
-        {
-            distances = geoDistance(cities, distances, numCities);
         }
         else
         {
@@ -267,7 +269,7 @@ public:
             }
         } while (chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start_time).count() < time_limit);
 
-        cout << "Number of iterations: " << iter_number << endl;
+        // cout << "Number of iterations: " << iter_number << endl;
 
         return best_solution;
     }
@@ -307,7 +309,7 @@ public:
             }
         } while (chrono::duration_cast<chrono::nanoseconds>(chrono::high_resolution_clock::now() - start_time).count() < time_limit);        
 
-        cout << "Number of iterations: " << iter_number << endl;
+        // cout << "Number of iterations: " << iter_number << endl;
 
         return best_solution;
     }
@@ -365,7 +367,7 @@ public:
                 for (int k = i + 1; k < numCities - 1; k++)
                 {
                     solutions_visited++;
-                    double delta = distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]];
+                    double delta = round(100.0*(distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]]))/100.0;
                     if (delta < 0)
                     {
                         inverse_order_of_subarray(new_solution, i, k);
@@ -408,7 +410,7 @@ public:
                 for (int k = i + 1; k < numCities - 1; k++)
                 {
                     solutions_visited++;
-                    double delta = distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]];
+                    double delta = round(100.0*(distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]]))/100.0;
                     if (delta < best_delta)
                     {
                         best_delta = delta;
@@ -422,9 +424,9 @@ public:
             if (best_delta < 0)
             {
                 inverse_order_of_subarray(new_solution, best_i, best_k);
+                improved = true;
             }
         }
-
         auto end_time = chrono::high_resolution_clock::now();
         // cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
         // cout << "Number of iterations: " << iter_number << endl;
@@ -435,7 +437,8 @@ public:
 int main()
 {
     // read data from file
-    string fileName = "tsp_instances/pr76.tsp"; // state file name
+    string instance_name = "ch150"; // instance name
+    string fileName = "tsp_instances/"+instance_name+".tsp"; // state file name
     Problem problem;
     double **cities;
     double **distances;
@@ -464,29 +467,33 @@ int main()
 
     // perform different algorithms
     Algorithm algorithm;
+    int number_of_iterations = 10;
     int *new_solution = new int[numCities];
     int *tmp_solution = new int[numCities];
     // RANDOM
     cout << endl
          << "RANDOM" << endl;
     // array for best solutions
-    int **random_solutions = new int *[10];
-    for (int i = 0; i < 10; i++)
+    int **random_solutions = new int *[number_of_iterations];
+    for (int i = 0; i < number_of_iterations; i++)
     {
         random_solutions[i] = new int[numCities];
     }
     // array for costs of best solutions
-    double *random_costs = new double[10];
+    double *random_costs = new double[number_of_iterations];
     int time_limit = 10000000; // time limit in nanoseconds
-    // perform algorithm 10 times
-    for (int i = 0; i < 10; i++)
+    // perform algorithm number_of_iterations times
+    for (int i = 0; i < number_of_iterations; i++)
     {
         // auto start_time = chrono::high_resolution_clock::now();
         random_solutions[i] = algorithm.randomAlgorithm(sol, solution, distances, numCities, cost, time_limit);
         random_costs[i] = solution.getCost(random_solutions[i], distances, numCities);
     }
+    // print average, min and max cost
+    print_avg_min_max_cost(random_costs, number_of_iterations);
+
     // save to file
-    solution.saveToFile("solution_random_pr76.txt", random_solutions, random_costs, numCities);
+    solution.saveToFile("solution_random_"+instance_name+".txt", random_solutions, random_costs, numCities);
     delete[] random_solutions;
     delete[] random_costs;
     cout << endl;
@@ -498,21 +505,23 @@ int main()
          << "RANDOM WALK" << endl;
     time_limit = 10000000; // time limit in nanoseconds
     // array for best solutions
-    int **rw_solutions = new int *[10];
-    for (int i = 0; i < 10; i++)
+    int **rw_solutions = new int *[number_of_iterations];
+    for (int i = 0; i < number_of_iterations; i++)
     {
         rw_solutions[i] = new int[numCities];
     }
     // array for costs of best solutions
-    double *rw_costs = new double[10];
-    // perform algorithm 10 times
-    for (int i = 0; i < 10; i++)
+    double *rw_costs = new double[number_of_iterations];
+    // perform algorithm number_of_iterations times
+    for (int i = 0; i < number_of_iterations; i++)
     {
         rw_solutions[i] = algorithm.randomWalkAlgorithm(sol, solution, distances, numCities, cost, time_limit);
         rw_costs[i] = solution.getCost(rw_solutions[i], distances, numCities);
     }
+    // print average, min and max cost
+    print_avg_min_max_cost(rw_costs, number_of_iterations);
     // save to file
-    solution.saveToFile("solution_random_walk_pr76.txt", rw_solutions, rw_costs, numCities);
+    solution.saveToFile("solution_random_walk_"+instance_name+".txt", rw_solutions, rw_costs, numCities);
     delete[] rw_solutions;
     delete[] rw_costs;
     cout << endl;
@@ -523,21 +532,23 @@ int main()
     cout << endl
          << "NEAREST NEIGHBOR" << endl;
     // array for best solutions
-    int **nn_solutions = new int *[10];
-    for (int i = 0; i < 10; i++)
+    int **nn_solutions = new int *[number_of_iterations];
+    for (int i = 0; i < number_of_iterations; i++)
     {
         nn_solutions[i] = new int[numCities];
     }
     // array for costs of best solutions
-    double *nn_costs = new double[10];
-    // perform nearest neighbor algorithm 10 times
-    for (int i = 0; i < 10; i++)
+    double *nn_costs = new double[number_of_iterations];
+    // perform nearest neighbor algorithm number_of_iterations times
+    for (int i = 0; i < number_of_iterations; i++)
     {
         nn_solutions[i] = algorithm.nearestNeighborAlgorithm(distances, numCities);
         nn_costs[i] = solution.getCost(nn_solutions[i], distances, numCities);
     }
+    // print average, min and max cost
+    print_avg_min_max_cost(nn_costs, number_of_iterations);
     // save to file
-    solution.saveToFile("solution_nn_pr76.txt", nn_solutions, nn_costs, numCities);
+    solution.saveToFile("solution_nn_"+instance_name+".txt", nn_solutions, nn_costs, numCities);
     delete[] nn_solutions;
     delete[] nn_costs;
     cout << endl;
@@ -548,23 +559,25 @@ int main()
     cout << endl
          << "GREEDY" << endl;
     // array for best solutions
-    int **greedy_solutions = new int *[10];
-    for (int i = 0; i < 10; i++)
+    int **greedy_solutions = new int *[number_of_iterations];
+    for (int i = 0; i < number_of_iterations; i++)
     {
         greedy_solutions[i] = new int[numCities];
     }
     // array for costs of best solutions
-    double *greedy_costs = new double[10];
-    // perform greedy algorithm 10 times
-    for (int i = 0; i < 10; i++)
+    double *greedy_costs = new double[number_of_iterations];
+    // perform greedy algorithm number_of_iterations times
+    for (int i = 0; i < number_of_iterations; i++)
     {
         sol = solution.getRandomSolution(sol, numCities);
         algorithm.greedyAlgorithm(sol, new_solution, distances, numCities);
         copy_array(greedy_solutions[i], new_solution, numCities);
         greedy_costs[i] = solution.getCost(greedy_solutions[i], distances, numCities);
     }
+    // print average, min and max cost
+    print_avg_min_max_cost(greedy_costs, number_of_iterations);
     // save to file
-    solution.saveToFile("solution_greedy_pr76.txt", greedy_solutions, greedy_costs, numCities);
+    solution.saveToFile("solution_greedy_"+instance_name+".txt", greedy_solutions, greedy_costs, numCities);
     delete[] greedy_solutions;
     delete[] greedy_costs;
     cout << endl;
@@ -575,24 +588,26 @@ int main()
     cout << endl
          << "STEEPEST" << endl;
     // array for best solutions
-    int **steepest_solutions = new int *[10];
-    for (int i = 0; i < 10; i++)
+    int **steepest_solutions = new int *[number_of_iterations];
+    for (int i = 0; i < number_of_iterations; i++)
     {
         steepest_solutions[i] = new int[numCities];
     }
     // array for costs of best solutions
-    double *steepest_costs = new double[10];
+    double *steepest_costs = new double[number_of_iterations];
 
-    // perform steepest algorithm 10 times
-    for (int i = 0; i < 10; i++)
+    // perform steepest algorithm number_of_iterations times
+    for (int i = 0; i < number_of_iterations; i++)
     {
         sol = solution.getRandomSolution(sol, numCities);
         algorithm.steepestAlgorithm(sol, new_solution, distances, numCities);
         steepest_solutions[i] = new_solution;
         steepest_costs[i] = solution.getCost(steepest_solutions[i], distances, numCities);
     }
+    // print average, min and max cost
+    print_avg_min_max_cost(steepest_costs, number_of_iterations);
     // save to file
-    solution.saveToFile("solution_steepest_pr76.txt", steepest_solutions, steepest_costs, numCities);
+    solution.saveToFile("solution_steepest_"+instance_name+".txt", steepest_solutions, steepest_costs, numCities);
     delete[] steepest_solutions;
     delete[] steepest_costs;
     cout << endl;
@@ -602,7 +617,7 @@ int main()
     for (int i = 0; i <= numCities; i++)
     {
         delete[] cities[i];
-        delete[] distances[i];  // in my case Exception has occurred Segmentation fault -> just comment for now to make it work.
+        // delete[] distances[i];  // in my case Exception has occurred Segmentation fault -> just comment for now to make it work.
     }
     delete[] cities;
     delete[] distances;
