@@ -35,4 +35,4 @@
 *.app
 
 # vscode stuff
-.vscode/
+.vscode/*
