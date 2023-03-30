@@ -218,6 +218,11 @@ public:
                 }
             }
         }
+        if(sol[size] != sol[0]){
+            cout << "ERROR: ending city not the same as the beginning one" << endl;
+            exit(1);   
+        }
+        std::cout<<"Checked! All fine!"<<std::endl;
     }
 
     // function to calculate euclidean distances between cities
@@ -335,7 +340,7 @@ public:
             delta = distances[current_solution[q - 1]][current_solution[w]] + distances[current_solution[q]][current_solution[w + 1]] - distances[current_solution[q - 1]][current_solution[q]] - distances[current_solution[w]][current_solution[w + 1]];
             delta_sum += delta;
             inverse_order_of_subarray(current_solution, q, w);
-            if (delta_sum < 0.0)
+            if (round(delta_sum * 1000) < 0)
             {
                 copy_array(best_solution, current_solution, numCities + 1);
                 delta_sum = 0.0;
@@ -380,8 +385,6 @@ public:
     void greedyAlgorithm(int *new_solution, double **distances, int numCities)
     {
         Solution solution;
-        auto start_time = chrono::high_resolution_clock::now();
-        // greedy improvement
         bool improved = true;
         int iter_number = 0;
         int solutions_visited = 0;
@@ -399,7 +402,7 @@ public:
                     {
                         solutions_visited++;
                         delta = distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]];
-                        if (delta < 0)
+                        if (round(delta * 1000) < 0)
                         {
                             inverse_order_of_subarray(new_solution, i, k);
                             improved = true;
@@ -413,7 +416,7 @@ public:
                     {
                         solutions_visited++;
                         delta = distances[new_solution[i - 1]][new_solution[k]] + distances[new_solution[i]][new_solution[k + 1]] - distances[new_solution[i - 1]][new_solution[i]] - distances[new_solution[k]][new_solution[k + 1]];
-                        if (delta < 0)
+                        if (round(delta * 1000) < 0)
                         {
                             inverse_order_of_subarray(new_solution, i, k);
                             improved = true;
@@ -427,10 +430,6 @@ public:
                 }
             }
         }
-        auto end_time = chrono::high_resolution_clock::now();
-        // cout << "Time taken by function: " << chrono::duration_cast<chrono::nanoseconds>(end_time - start_time).count() << " nanoseconds" << endl;
-        // cout << "Number of iterations: " << iter_number << endl;
-        // cout << "Number of solutions visited: " << solutions_visited << endl;
     }
 
     void steepestAlgorithm(int *new_solution, double **distances, int numCities)
@@ -655,17 +654,14 @@ void experiment_greedy(int *sol, Solution solution_utilities, int numCities, dou
     // array for costs of best solutions
     double *greedy_costs = new double[10];
     // perform greedy algorithm 10 times
-    int numIterations = 10;
-    for (int i = 0; i < numIterations; i++)
+    for (int i = 0; i < number_of_iterations; i++)
     {
         solution_utilities.makeRandom(sol, numCities);
         algorithm_functions.greedyAlgorithm(sol, distances, numCities); // works in situ on 'sol' variable
         copy_array(greedy_solutions[i], sol, numCities + 1);
         greedy_costs[i] = solution_utilities.getCost(greedy_solutions[i], distances, numCities);
     }
-    // print average, min and max cost
     print_avg_min_max_cost(greedy_costs, number_of_iterations);
-    // save to file
     solution_utilities.saveToFile("solution_greedy_" + instance_name + ".txt", greedy_solutions, greedy_costs, numCities);
     delete[] greedy_solutions;
     delete[] greedy_costs;
