@@ -218,11 +218,12 @@ public:
                 }
             }
         }
-        if(sol[size] != sol[0]){
+        if (sol[size] != sol[0])
+        {
             cout << "ERROR: ending city not the same as the beginning one" << endl;
-            exit(1);   
+            exit(1);
         }
-        std::cout<<"Checked! All fine!"<<std::endl;
+        std::cout << "Checked! All fine!" << std::endl;
     }
 
     // function to calculate euclidean distances between cities
@@ -495,6 +496,53 @@ public:
         // cout << "Number of iterations: " << iter_number << endl;
         // cout << "Number of solutions visited: " << solutions_visited << endl;
     }
+
+    void simulatedAnnealingAlgorithm(int *new_solution, double **distances, int numCities, double initialTemperature, double endTemperature, int length, double alpha, int **edge_pairs_nonadjacent, int edge_pairs_nonadjacent_SIZE)
+    {
+        double temperature = initialTemperature;
+        double delta;
+        int edges_pair_id;
+        int q;
+        int w;
+        int non_improving_iterations = 0;
+        while (temperature > endTemperature && non_improving_iterations < 10 * length)
+        {
+            for (int l = 0; l < length; l++)
+            {
+                // get neighbour solution
+                edges_pair_id = uniform_random(0, edge_pairs_nonadjacent_SIZE - 1);
+                q = edge_pairs_nonadjacent[edges_pair_id][0];
+                w = edge_pairs_nonadjacent[edges_pair_id][1];
+                // calculate delta
+                delta = distances[new_solution[q - 1]][new_solution[w]] + distances[new_solution[q]][new_solution[w + 1]] - distances[new_solution[q - 1]][new_solution[q]] - distances[new_solution[w]][new_solution[w + 1]];
+                // accept or reject neighbour solution
+                if (round(delta * 1000) < 0)
+                {
+                    // accept neighbour solution
+                    inverse_order_of_subarray(new_solution, q, w);
+                    non_improving_iterations = 0;
+                }
+                else
+                {
+                    double probability = exp(-delta / temperature);
+                    double random = (double)rand() / RAND_MAX;
+                    if (random < probability)
+                    {
+                        // accept neighbour solution
+                        inverse_order_of_subarray(new_solution, q, w);
+                        non_improving_iterations = 0;
+                    }
+                    else
+                    {
+                        // reject neighbour solution
+                        non_improving_iterations++;
+                    }
+                }
+            }
+            // decrease temperature
+            temperature = temperature * alpha;
+        }
+    }
 };
 
 void experiment_random(int *sol, Solution solution_utilities, int numCities, double time_limit, double **distances, Algorithm algorithm_functions, string instance_name)
@@ -701,6 +749,40 @@ void experiment_steepest(int *sol, Solution solution_utilities, int numCities, d
     cout << "-----------------------------------------" << endl;
 }
 
+void experiment_simulated_annealing(int *sol, Solution solution_utilities, int numCities, double **distances, Algorithm algorithm_functions, string instance_name, double initial_temperature, double endTemperature, int length, double alpha)
+{
+    int number_of_iterations = 10;
+    cout << endl
+         << "SIMULATED ANNEALING" << endl;
+    int **edge_pairs = make_randomWalk_array_of_edge_pairs_non_adjacent(numCities, solution_utilities);
+    int edge_pairs_nonadjacent_size = (numCities - 3) * numCities / 2;
+    // array for best solutions
+    int **sa_solutions = new int *[number_of_iterations];
+    for (int i = 0; i < number_of_iterations; i++)
+    {
+        sa_solutions[i] = new int[numCities];
+    }
+    // array for costs of best solutions
+    double *sa_costs = new double[number_of_iterations];
+
+    // perform simulated annealing algorithm number_of_iterations times
+    for (int i = 0; i < number_of_iterations; i++)
+    {
+        solution_utilities.makeRandom(sol, numCities);
+        algorithm_functions.simulatedAnnealingAlgorithm(sol, distances, numCities, initial_temperature, endTemperature, length, alpha, edge_pairs, edge_pairs_nonadjacent_size); // works in situ on 'sol' variable
+        copy_array(sa_solutions[i], sol, numCities + 1);
+        sa_costs[i] = solution_utilities.getCost(sa_solutions[i], distances, numCities);
+    }
+    // print average, min and max cost
+    print_avg_min_max_cost(sa_costs, number_of_iterations);
+    // save to file
+    solution_utilities.saveToFile("solution_sa_" + instance_name + ".txt", sa_solutions, sa_costs, numCities);
+    delete[] sa_solutions;
+    delete[] sa_costs;
+    cout << endl;
+    cout << "-----------------------------------------" << endl;
+}
+
 int main()
 {
     srand(time(NULL));
@@ -732,13 +814,14 @@ int main()
 
     // perform different algorithms
     Algorithm algorithm;
-    int time_limit = 3000000; // time limit in nanoseconds; used for random, randomWalk
+    // int time_limit = 3000000; // time limit in nanoseconds; used for random, randomWalk
 
-    experiment_random(sol, solution_utilities, numCities, time_limit, distances, algorithm, instance_name);
-    experiment_randomWalk(sol, solution_utilities, numCities, time_limit, distances, algorithm, instance_name);
-    experiment_nearest_neighbor(solution_utilities, numCities, distances, algorithm, instance_name);
-    experiment_greedy(sol, solution_utilities, numCities, distances, algorithm, instance_name);
-    experiment_steepest(sol, solution_utilities, numCities, distances, algorithm, instance_name);
+    // experiment_random(sol, solution_utilities, numCities, time_limit, distances, algorithm, instance_name);
+    // experiment_randomWalk(sol, solution_utilities, numCities, time_limit, distances, algorithm, instance_name);
+    // experiment_nearest_neighbor(solution_utilities, numCities, distances, algorithm, instance_name);
+    // experiment_greedy(sol, solution_utilities, numCities, distances, algorithm, instance_name);
+    // experiment_steepest(sol, solution_utilities, numCities, distances, algorithm, instance_name);
+    experiment_simulated_annealing(sol, solution_utilities, numCities, distances, algorithm, instance_name, 1000, 0.01, 100, 0.99);
 
     // free the dynamically allocated memory
     for (int i = 0; i <= numCities; i++)
