@@ -505,6 +505,8 @@ public:
         int q;
         int w;
         int non_improving_iterations = 0;
+        // !!! in case of calculating visited solutions
+        // int visited_solutions = 0;
         while (temperature > endTemperature && non_improving_iterations < 10 * length)
         {
             for (int l = 0; l < length; l++)
@@ -521,6 +523,8 @@ public:
                     // accept neighbour solution
                     inverse_order_of_subarray(new_solution, q, w);
                     non_improving_iterations = 0;
+                    // !!! in case of calculating visited solutions
+                    // visited_solutions++;
                 }
                 else
                 {
@@ -531,6 +535,8 @@ public:
                         // accept neighbour solution
                         inverse_order_of_subarray(new_solution, q, w);
                         non_improving_iterations = 0;
+                        // !!! in case of calculating visited solutions
+                        // visited_solutions++;
                     }
                     else
                     {
@@ -542,6 +548,8 @@ public:
             // decrease temperature
             temperature = temperature * alpha;
         }
+        // !!! in case of calculating visited solutions
+        // cout << "Number of visited solutions: " << visited_solutions << endl;
     }
 };
 
@@ -764,66 +772,80 @@ void experiment_simulated_annealing(int *sol, Solution solution_utilities, int n
     }
     // array for costs of best solutions
     double *sa_costs = new double[number_of_iterations];
+    // array for times
+    double *sa_times = new double[number_of_iterations];
 
     // perform simulated annealing algorithm number_of_iterations times
     for (int i = 0; i < number_of_iterations; i++)
     {
+        // !!! in case of time measurement
+        // auto start = chrono::high_resolution_clock::now();
         solution_utilities.makeRandom(sol, numCities);
         algorithm_functions.simulatedAnnealingAlgorithm(sol, distances, numCities, initial_temperature, endTemperature, length, alpha, edge_pairs, edge_pairs_nonadjacent_size); // works in situ on 'sol' variable
+        // !!! in case of time measurement
+        // auto end = chrono::high_resolution_clock::now();
         copy_array(sa_solutions[i], sol, numCities + 1);
         sa_costs[i] = solution_utilities.getCost(sa_solutions[i], distances, numCities);
+        // !!! in case of time measurement
+        // sa_times[i] = chrono::duration_cast<chrono::nanoseconds>(end - start).count();
+
     }
     // print average, min and max cost
     print_avg_min_max_cost(sa_costs, number_of_iterations);
     // save to file
     solution_utilities.saveToFile("solution_sa_" + instance_name + ".txt", sa_solutions, sa_costs, numCities);
+    // !!! in case of time measurement
+    // solution_utilities.saveToFile("solution_sa_times_" + instance_name + ".txt", sa_solutions, sa_times, numCities);
     delete[] sa_solutions;
     delete[] sa_costs;
+    // !!! in case of time measurement
+    // delete[] sa_times;
     cout << endl;
     cout << "-----------------------------------------" << endl;
 }
 
-int main()
+void experiment_10times_each()
 {
-    srand(time(NULL));
-    // read data from file
-    string fileName = "tsp_instances/pr76.tsp"; // state file name
-    string instance_name = "pr76";
+    string instances[8] = {"ch130", "ch150", "eil101", "kroA100", "kroC100", "kroD100", "lin105", "pr76"};
+    string fileName;
+    string instance_name;
     Problem problem;
     double **cities;
     double **distances;
-    int numCities = problem.getNumCities(fileName); // get number of cities
-    string type = problem.getType(fileName);        // get type of distance
-    cout << "Number of cities:" << numCities << endl;
-    cout << "Type of distance:" << type << endl;
-    cities = problem.readFromFile(fileName, cities); // read cities from file
-
-    // -----------------------------------------
-
-    // calculate all distances, get initial solution and its cost
-    Solution solution_utilities;
-    distances = solution_utilities.calculateDistance(cities, distances, numCities, type); // calculate distance between cities
-
-    int *sol = solution_utilities.getInitialSolution(numCities);
-    solution_utilities.makeRandom(sol, numCities);                       // shuffles solution to produce random solution
-    double cost = solution_utilities.getCost(sol, distances, numCities); // get cost of initial solution
-    cout << "Initial solution cost: " << cost << endl;
-    cout << "-----------------------------------------" << endl;
-
-    // -----------------------------------------
-
-    // perform different algorithms
+    int numCities;
+    string type;
+    int *sol;
+    double cost;
     Algorithm algorithm;
-    // int time_limit = 3000000; // time limit in nanoseconds; used for random, randomWalk
+    for (string instance : instances)
+    {
+        srand(time(NULL));
+        // read data from file
+        fileName = "tsp_instances/" + instance + ".tsp"; // state file name
+        instance_name = instance;
+        numCities = problem.getNumCities(fileName); // get number of cities
+        type = problem.getType(fileName);           // get type of distance
+        cout << "Instance name:" << instance_name << endl;
+        cout << "Number of cities:" << numCities << endl;
+        cout << "Type of distance:" << type << endl;
+        cities = problem.readFromFile(fileName, cities); // read cities from file
 
-    // experiment_random(sol, solution_utilities, numCities, time_limit, distances, algorithm, instance_name);
-    // experiment_randomWalk(sol, solution_utilities, numCities, time_limit, distances, algorithm, instance_name);
-    // experiment_nearest_neighbor(solution_utilities, numCities, distances, algorithm, instance_name);
-    // experiment_greedy(sol, solution_utilities, numCities, distances, algorithm, instance_name);
-    // experiment_steepest(sol, solution_utilities, numCities, distances, algorithm, instance_name);
-    experiment_simulated_annealing(sol, solution_utilities, numCities, distances, algorithm, instance_name, 1000, 0.01, 100, 0.99);
+        // -----------------------------------------
 
-    // free the dynamically allocated memory
+        // calculate all distances, get initial solution and its cost
+        Solution solution_utilities;
+        distances = solution_utilities.calculateDistance(cities, distances, numCities, type); // calculate distance between cities
+
+        sol = solution_utilities.getInitialSolution(numCities);
+        solution_utilities.makeRandom(sol, numCities);                       // shuffles solution to produce random solution
+        cost = solution_utilities.getCost(sol, distances, numCities); // get cost of initial solution
+        cout << "Initial solution cost: " << cost << endl;
+        cout << "-----------------------------------------" << endl;
+
+        // -----------------------------------------
+
+        experiment_simulated_annealing(sol, solution_utilities, numCities, distances, algorithm, instance_name, 1000, 0.01, numCities, 0.99);
+    }
     for (int i = 0; i <= numCities; i++)
     {
         delete[] cities[i];
@@ -832,5 +854,56 @@ int main()
     delete[] cities;
     delete[] distances;
     delete[] sol;
+}
+
+int main()
+{
+    // srand(time(NULL));
+    // // read data from file
+    // string fileName = "tsp_instances/pr76.tsp"; // state file name
+    // string instance_name = "pr76";
+    // Problem problem;
+    // double **cities;
+    // double **distances;
+    // int numCities = problem.getNumCities(fileName); // get number of cities
+    // string type = problem.getType(fileName);        // get type of distance
+    // cout << "Number of cities:" << numCities << endl;
+    // cout << "Type of distance:" << type << endl;
+    // cities = problem.readFromFile(fileName, cities); // read cities from file
+
+    // // -----------------------------------------
+
+    // // calculate all distances, get initial solution and its cost
+    // Solution solution_utilities;
+    // distances = solution_utilities.calculateDistance(cities, distances, numCities, type); // calculate distance between cities
+
+    // int *sol = solution_utilities.getInitialSolution(numCities);
+    // solution_utilities.makeRandom(sol, numCities);                       // shuffles solution to produce random solution
+    // double cost = solution_utilities.getCost(sol, distances, numCities); // get cost of initial solution
+    // cout << "Initial solution cost: " << cost << endl;
+    // cout << "-----------------------------------------" << endl;
+
+    // // -----------------------------------------
+
+    // // perform different algorithms
+    // Algorithm algorithm;
+    // int time_limit = 3000000; // time limit in nanoseconds; used for random, randomWalk
+
+    // experiment_random(sol, solution_utilities, numCities, time_limit, distances, algorithm, instance_name);
+    // experiment_randomWalk(sol, solution_utilities, numCities, time_limit, distances, algorithm, instance_name);
+    // experiment_nearest_neighbor(solution_utilities, numCities, distances, algorithm, instance_name);
+    // experiment_greedy(sol, solution_utilities, numCities, distances, algorithm, instance_name);
+    // experiment_steepest(sol, solution_utilities, numCities, distances, algorithm, instance_name);
+    // experiment_simulated_annealing(sol, solution_utilities, numCities, distances, algorithm, instance_name, 1000, 0.01, 100, 0.99);
+    experiment_10times_each();
+    // free the dynamically allocated memory
+    // for (int i = 0; i <= numCities; i++)
+    // {
+    //     delete[] cities[i];
+    //     // delete[] distances[i];  // in my case Exception has occurred Segmentation fault -> just comment for now to make it work.
+    // }
+    // delete[] cities;
+    // delete[] distances;
+    // delete[] sol;
     return 0;
 }
