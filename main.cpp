@@ -223,7 +223,6 @@ public:
             cout << "ERROR: ending city not the same as the beginning one" << endl;
             exit(1);
         }
-        std::cout << "Checked! All fine!" << std::endl;
     }
 
     // function to calculate euclidean distances between cities
@@ -543,6 +542,134 @@ public:
             temperature = temperature * alpha;
         }
     }
+
+    int **_intialize_tabu_array_edge_exchange_moves(int numCities){
+        int **tabu_array = new int *[numCities - 2];
+        for (int i = 1; i < numCities - 1; i++)
+        {
+            if (i == 1)
+            { // we don't use edge between 0 and numCities - 1 because it is shares node 0
+                tabu_array[i - 1] = new int[numCities - i - 2];
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    tabu_array[i - 1][k - (i + 1)] = 0;
+                }
+            }
+            else
+            {
+                tabu_array[i - 1] = new int[numCities - i - 1];
+                for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
+                {
+                    tabu_array[i - 1][k - (i + 1)] = 0;
+                }
+            }
+        }
+        return tabu_array;
+    }
+
+    void _update_tabu_array_edge_exchange(int **tabu_array, int numCities, int tabu_tenure){
+        for (int i = 1; i < numCities - 1; i++)
+        {
+            if (i == 1)
+            { // we don't use edge between 0 and numCities - 1 because it is shares node 0
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    if (tabu_array[i - 1][k - (i + 1)] != 0){
+                        tabu_array[i - 1][k - (i + 1)] += 1;
+                        if (tabu_array[i - 1][k - (i + 1)] == tabu_tenure){
+                            tabu_array[i - 1][k - (i + 1)] = 0;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
+                {
+                    if (tabu_array[i - 1][k - (i + 1)] != 0){
+                        tabu_array[i - 1][k - (i + 1)] += 1;
+                        if (tabu_array[i - 1][k - (i + 1)] == tabu_tenure){
+                            tabu_array[i - 1][k - (i + 1)] = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void _selectBestMove(int numCities, double **distances, int *curr_solution, double &best_delta, int &best_i, int &best_k, int **tabu_array){
+        // works in situ, currently searches ALL neighborhood
+        double delta;
+        // iterate over all possible moves
+        for (int i = 1; i < numCities - 1; i++)
+        {
+            if (i == 1)
+            { // we don't use edge between 0 and numCities - 1 because it is shares node 0
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    if (tabu_array[i - 1][k - (i + 1)] == 0){  // if it's not tabu
+                        delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+                        if (delta < best_delta)
+                        {
+                            best_delta = delta;
+                            best_i = i;
+                            best_k = k;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
+                {
+                    if (tabu_array[i - 1][k - (i + 1)] == 0){  // if it's not tabu
+                        delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+                        if (delta < best_delta)
+                        {
+                            best_delta = delta;
+                            best_i = i;
+                            best_k = k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    int *tabuSearchAlgorithm(int *new_solution, double **distances, int numCities, int stop_noimprovement)
+    {
+        // works in situ, but saves best solution
+        Solution solution;
+        auto start_time = chrono::high_resolution_clock::now();
+        int *best_solution = new int[numCities + 1];
+        copy_array(best_solution, new_solution, numCities + 1);
+        int tabu_tenure = numCities / 4;
+        int iter_noimprovement = 0;
+        int **tabu_array = this->_intialize_tabu_array_edge_exchange_moves(numCities);
+        double best_delta;
+        int best_i;
+        int best_k;
+        double delta_cummulative_since_last_best = 0.0;
+        while(iter_noimprovement < stop_noimprovement){
+            // select best move from neighbours using aspiration criteria
+            best_delta = 0.0;
+            this->_selectBestMove(numCities, distances, new_solution, best_delta, best_i, best_k, tabu_array);
+            //apply move to the new solution (no matter whether there is improvement in value of solution)
+            inverse_order_of_subarray(new_solution, best_i, best_k);
+            delta_cummulative_since_last_best += best_delta;
+            // update tabu list
+            this->_update_tabu_array_edge_exchange(tabu_array, numCities, tabu_tenure);
+            tabu_array[best_i - 1][best_k - (best_i + 1)] = 1;
+            if (round(delta_cummulative_since_last_best * 1000) < 0){
+                delta_cummulative_since_last_best = 0.0;
+                copy_array(best_solution, new_solution, numCities + 1);
+            }
+            else{
+                iter_noimprovement++;
+            }
+        }
+        return best_solution;
+    }
 };
 
 void experiment_random(int *sol, Solution solution_utilities, int numCities, double time_limit, double **distances, Algorithm algorithm_functions, string instance_name)
@@ -783,6 +910,36 @@ void experiment_simulated_annealing(int *sol, Solution solution_utilities, int n
     cout << "-----------------------------------------" << endl;
 }
 
+void experiment_tabu_search(int *sol, Solution solution_utilities, int numCities, double **distances, Algorithm algorithm_functions, string instance_name, int iterations_no_improvement_to_stop){
+    int number_of_iterations = 10;
+    cout << endl
+         << "TABU SEARCH" << endl;
+    // array for best solutions
+    int **tabu_solutions = new int *[number_of_iterations];
+    for (int i = 0; i < number_of_iterations; i++)
+    {
+        tabu_solutions[i] = new int[numCities + 1];
+    }
+    // array for costs of best solutions
+    double *tabu_costs = new double[number_of_iterations];
+
+    // perform tabu search algorithm number_of_iterations time
+    for (int i = 0; i < number_of_iterations; i++)
+    {
+        solution_utilities.makeRandom(sol, numCities);
+        tabu_solutions[i] = algorithm_functions.tabuSearchAlgorithm(sol, distances, numCities, iterations_no_improvement_to_stop);
+        tabu_costs[i] = solution_utilities.getCost(tabu_solutions[i], distances, numCities);
+    }
+    // print average, min and max cost
+    print_avg_min_max_cost(tabu_costs, number_of_iterations);
+    // save to file
+    solution_utilities.saveToFile("solution_tabu_" + instance_name + ".txt", tabu_solutions, tabu_costs, numCities);
+    delete[] tabu_solutions;
+    delete[] tabu_costs;
+    cout << endl;
+    cout << "-----------------------------------------" << endl;
+}
+
 int main()
 {
     srand(time(NULL));
@@ -822,6 +979,7 @@ int main()
     // experiment_greedy(sol, solution_utilities, numCities, distances, algorithm, instance_name);
     // experiment_steepest(sol, solution_utilities, numCities, distances, algorithm, instance_name);
     experiment_simulated_annealing(sol, solution_utilities, numCities, distances, algorithm, instance_name, 1000, 0.01, 100, 0.99);
+    experiment_tabu_search(sol, solution_utilities, numCities, distances, algorithm, instance_name, 100);
 
     // free the dynamically allocated memory
     for (int i = 0; i <= numCities; i++)
