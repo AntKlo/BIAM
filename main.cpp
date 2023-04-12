@@ -575,39 +575,10 @@ public:
         return tabu_array;
     }
 
-    void _update_tabu_array_edge_exchange(int **tabu_array, int numCities, int tabu_tenure){
-        for (int i = 1; i < numCities - 1; i++)
-        {
-            if (i == 1)
-            { // we don't use edge between 0 and numCities - 1 because it is shares node 0
-                for (int k = i + 1; k < numCities - 1; k++)
-                {
-                    if (tabu_array[i - 1][k - (i + 1)] != 0){
-                        tabu_array[i - 1][k - (i + 1)] += 1;
-                        if (tabu_array[i - 1][k - (i + 1)] == tabu_tenure){
-                            tabu_array[i - 1][k - (i + 1)] = 0;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
-                {
-                    if (tabu_array[i - 1][k - (i + 1)] != 0){
-                        tabu_array[i - 1][k - (i + 1)] += 1;
-                        if (tabu_array[i - 1][k - (i + 1)] == tabu_tenure){
-                            tabu_array[i - 1][k - (i + 1)] = 0;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    void _selectBestMove(int numCities, double **distances, int *curr_solution, double &best_delta, int &best_i, int &best_k, int **tabu_array){
+    void _selectBestMove(int numCities, double **distances, int *curr_solution, double &best_delta, int &best_i, int &best_k, int **tabu_array, double delta_cummulative_since_last_best){
         // works in situ, currently searches ALL neighborhood
         double delta;
+        double total_delta;
         // iterate over all possible moves
         for (int i = 1; i < numCities - 1; i++)
         {
@@ -615,8 +586,9 @@ public:
             { // we don't use edge between 0 and numCities - 1 because it is shares node 0
                 for (int k = i + 1; k < numCities - 1; k++)
                 {
-                    if (tabu_array[i - 1][k - (i + 1)] == 0){  // if it's not tabu
-                        delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+                    delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+                    total_delta = delta + delta_cummulative_since_last_best;
+                    if (tabu_array[i - 1][k - (i + 1)] == 0 || total_delta < 0){  // if it's not tabu OR if it's tabu but it's better than currently best solution
                         if (delta < best_delta)
                         {
                             best_delta = delta;
@@ -630,8 +602,9 @@ public:
             {
                 for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
                 {
-                    if (tabu_array[i - 1][k - (i + 1)] == 0){  // if it's not tabu
-                        delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+                    delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+                    total_delta = delta + delta_cummulative_since_last_best;
+                    if (tabu_array[i - 1][k - (i + 1)] == 0 || total_delta < 0){  // if it's not tabu OR if it's tabu but it's better than currently best solution
                         if (delta < best_delta)
                         {
                             best_delta = delta;
@@ -644,11 +617,110 @@ public:
         }
     }
 
+    void __update_tabu_array_at_i_k(bool select_least_in_tabu, double **distances, int *curr_solution, int **tabu_array, int i, int k, int tabu_tenure, int &prev_maxi_val, int &new_maxi_val, int &best_i, int &best_k, double &best_delta){
+        if (tabu_array[i - 1][k - (i + 1)] != 0){
+            tabu_array[i - 1][k - (i + 1)] += 1;
+            if (tabu_array[i - 1][k - (i + 1)] == prev_maxi_val + 1){
+                if (select_least_in_tabu){
+                    best_delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]]; 
+                    best_i = i;
+                    best_k = k;
+                    tabu_array[i - 1][k - (i + 1)] = 1;
+                }
+            }
+            if (tabu_array[i - 1][k - (i + 1)] == tabu_tenure + 1){
+                tabu_array[i - 1][k - (i + 1)] = 0;
+            }
+            if (tabu_array[i - 1][k - (i + 1)] > new_maxi_val){
+                new_maxi_val = tabu_array[i - 1][k - (i + 1)];
+            }
+        }
+    }
+
+    void _update_tabu_array_edge_exchange(bool select_least_in_tabu, int **tabu_array, int numCities, int tabu_tenure, double **distances, int *curr_solution,  double &best_delta, int &best_i, int &best_k, int &prev_maxi_val, int &new_maxi_val){
+        for (int i = 1; i < numCities - 1; i++)
+        {
+            if (i == 1)
+            { // we don't use edge between 0 and numCities - 1 because it is shares node 0
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    this->__update_tabu_array_at_i_k(select_least_in_tabu, distances, curr_solution, tabu_array, i, k, tabu_tenure, prev_maxi_val, new_maxi_val, best_i, best_k, best_delta);
+                }
+            }
+            else
+            {
+                for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
+                {
+                    this->__update_tabu_array_at_i_k(select_least_in_tabu, distances, curr_solution, tabu_array, i, k, tabu_tenure, prev_maxi_val, new_maxi_val, best_i, best_k, best_delta);
+                }
+            }
+        }
+    }
+
+    int __get_mini_tabu_value(int numCities, int **tabu_array){
+        int miniii = 10000000;
+        for (int i = 1; i < numCities - 1; i++)
+        {
+            if (i == 1)
+            { // we don't use edge between 0 and numCities - 1 because it is shares node 0
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    if (tabu_array[i - 1][k - (i + 1)] != 0){
+                        if (tabu_array[i - 1][k - (i + 1)] < miniii){
+                            miniii = tabu_array[i - 1][k - (i + 1)];
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
+                {
+                    if (tabu_array[i - 1][k - (i + 1)] != 0){
+                        if (tabu_array[i - 1][k - (i + 1)] < miniii){
+                            miniii = tabu_array[i - 1][k - (i + 1)];
+                        }
+                    }
+                }
+            }
+        }
+        return miniii;
+    }
+
+    int __get_maxi_tabu_value(int numCities, int **tabu_array){
+        int maxi = -1;
+        for (int i = 1; i < numCities - 1; i++)
+        {
+            if (i == 1)
+            { // we don't use edge between 0 and numCities - 1 because it is shares node 0
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    if (tabu_array[i - 1][k - (i + 1)] != 0){
+                        if (tabu_array[i - 1][k - (i + 1)] > maxi){
+                            maxi = tabu_array[i - 1][k - (i + 1)];
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
+                {
+                    if (tabu_array[i - 1][k - (i + 1)] != 0){
+                        if (tabu_array[i - 1][k - (i + 1)] > maxi){
+                            maxi= tabu_array[i - 1][k - (i + 1)];
+                        }
+                    }
+                }
+            }
+        }
+        return maxi;
+    }
+
     int *tabuSearchAlgorithm(int *new_solution, double **distances, int numCities, int stop_noimprovement)
     {
         // works in situ, but saves best solution
         Solution solution;
-        auto start_time = chrono::high_resolution_clock::now();
         int *best_solution = new int[numCities + 1];
         copy_array(best_solution, new_solution, numCities + 1);
         int tabu_tenure = numCities / 4;
@@ -658,16 +730,28 @@ public:
         int best_i;
         int best_k;
         double delta_cummulative_since_last_best = 0.0;
+        bool select_least_in_tabu = false;
+        int prev_tabu_size = 0;
+        int next_tabu_size = 0;
         while(iter_noimprovement < stop_noimprovement){
             // select best move from neighbours using aspiration criteria
             best_delta = 0.0;
-            this->_selectBestMove(numCities, distances, new_solution, best_delta, best_i, best_k, tabu_array);
-            //apply move to the new solution (no matter whether there is improvement in value of solution)
+            best_i = -1;
+            best_k = -1;
+            select_least_in_tabu = false;
+            this->_selectBestMove(numCities, distances, new_solution, best_delta, best_i, best_k, tabu_array, delta_cummulative_since_last_best);
+            if (best_i == -1){
+                select_least_in_tabu = true;  // aspiration criteria to select least in tabu if no non-tabu move is found
+            }
+            else{
+                tabu_array[best_i - 1][best_k - (best_i + 1)] = 1; // select best move and add to tabu
+            }
+            next_tabu_size = -1;
+            
+            this->_update_tabu_array_edge_exchange(select_least_in_tabu, tabu_array, numCities, tabu_tenure, distances, new_solution, best_delta, best_i, best_k, prev_tabu_size, next_tabu_size);
+
             inverse_order_of_subarray(new_solution, best_i, best_k);
             delta_cummulative_since_last_best += best_delta;
-            // update tabu list
-            this->_update_tabu_array_edge_exchange(tabu_array, numCities, tabu_tenure);
-            tabu_array[best_i - 1][best_k - (best_i + 1)] = 1;
             if (round(delta_cummulative_since_last_best * 1000) < 0){
                 delta_cummulative_since_last_best = 0.0;
                 copy_array(best_solution, new_solution, numCities + 1);
@@ -675,6 +759,7 @@ public:
             else{
                 iter_noimprovement++;
             }
+            prev_tabu_size = next_tabu_size;
         }
         return best_solution;
     }
@@ -965,6 +1050,7 @@ void experiment_tabu_search(int *sol, Solution solution_utilities, int numCities
 void experiment_10times_each()
 {
     string instances[8] = {"ch130", "ch150", "eil101", "kroA100", "kroC100", "kroD100", "lin105", "pr76"};
+    // string instances[1] = {"ch150"};
     string fileName;
     string instance_name;
     Problem problem;
