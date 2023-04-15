@@ -9,8 +9,22 @@
 #include <chrono>
 #include <limits>
 #include <random>
+#include <queue>
+#include <float.h>
+#include <algorithm>
+
 
 using namespace std;
+
+
+struct Move {
+    int i;
+    int k;
+    double delta;
+    bool operator<(const Move& other) const {
+        return delta < other.delta;
+    }
+};
 
 void swap(int *a, int *b)
 {
@@ -617,6 +631,89 @@ public:
         }
     }
 
+    // utils for select top k moves
+    void _heapify(Move* moves, int n, int i) {
+        int smallest = i;
+        int l = 2 * i + 1;
+        int r = 2 * i + 2;
+
+        if (l < n && moves[l].delta < moves[smallest].delta) {
+            smallest = l;
+        }
+
+        if (r < n && moves[r].delta < moves[smallest].delta) {
+            smallest = r;
+        }
+
+        if (smallest != i) {
+            swap(moves[i], moves[smallest]);
+            this->_heapify(moves, n, smallest);
+        }
+    }
+
+    void _top_k_moves(Move* moves, int n, int k, Move* top_k_moves) {
+        for (int i = n / 2 - 1; i >= 0; --i) {
+            this->_heapify(moves, n, i);
+        }
+
+        for (int i = n - 1; i >= n - k; --i) {
+            top_k_moves[n - i - 1] = moves[0];
+            swap(moves[0], moves[i]);
+            this->_heapify(moves, i, 0);
+        }
+    }
+
+    Move* _selectTopKMoves(Move* moves, Move* top_k_moves, int k, int numCities, double **distances, int *curr_solution, int **tabu_array, double delta_cummulative_since_last_best){
+        // computes all the moves values
+        double delta;
+        double total_delta;
+        int counter = 0;
+        for (int i = 1; i < numCities - 1; i++)
+        {
+            if (i == 1)
+            { // we don't use edge between 0 and numCities - 1 because it is shares node 0
+                for (int k = i + 1; k < numCities - 1; k++)
+                {
+                    delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+                    total_delta = delta + delta_cummulative_since_last_best;
+                    if (tabu_array[i - 1][k - (i + 1)] == 0 || total_delta < 0){  // if it's not tabu OR if it's tabu but it's better than currently best solution
+                        moves[counter].delta = delta;
+                        moves[counter].i = i;
+                        moves[counter].k = k;
+                    }
+                    else{
+                        moves[counter].delta = DBL_MAX;
+                        moves[counter].i = i;
+                        moves[counter].k = k;
+                    }
+                    counter++;
+                }
+            }
+            else
+            {
+                for (int k = i + 1; k < numCities; k++) // here we use edge between 0 and numCities - 1, which was added at the end of the solution
+                {
+                    delta = distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+                    total_delta = delta + delta_cummulative_since_last_best;
+                    if (tabu_array[i - 1][k - (i + 1)] == 0 || total_delta < 0){  // if it's not tabu OR if it's tabu but it's better than currently best solution
+                        moves[counter].delta = delta;
+                        moves[counter].i = i;
+                        moves[counter].k = k;
+                    }
+                    else{
+                        moves[counter].delta = DBL_MAX;
+                        moves[counter].i = i;
+                        moves[counter].k = k;
+                    }
+                    counter++;
+                }
+            }
+        }
+        // select top k moves
+        this->_top_k_moves(moves, numCities * (numCities - 3) / 2, k, top_k_moves);
+        return top_k_moves;
+    }
+
     void __update_tabu_array_at_i_k(bool select_least_in_tabu, double **distances, int *curr_solution, int **tabu_array, int i, int k, int tabu_tenure, int &prev_maxi_val, int &new_maxi_val, int &best_i, int &best_k, double &best_delta){
         if (tabu_array[i - 1][k - (i + 1)] != 0){
             tabu_array[i - 1][k - (i + 1)] += 1;
@@ -717,7 +814,11 @@ public:
         return maxi;
     }
 
-    int *tabuSearchAlgorithm(int *new_solution, double **distances, int numCities, int stop_noimprovement)
+    double _get_delta_edge_exchange_move(int *curr_solution, double **distances, int i, int k){
+        return distances[curr_solution[i - 1]][curr_solution[k]] + distances[curr_solution[i]][curr_solution[k + 1]] - distances[curr_solution[i - 1]][curr_solution[i]] - distances[curr_solution[k]][curr_solution[k + 1]];
+    }
+
+    int *tabuSearchAlgorithm(Move* moves, Move* top_k_moves, int k, int *new_solution, double **distances, int numCities, int stop_noimprovement)
     {
         // works in situ, but saves best solution
         Solution solution;
@@ -733,13 +834,61 @@ public:
         bool select_least_in_tabu = false;
         int prev_tabu_size = 0;
         int next_tabu_size = 0;
+        int the_counter = 0;
+        int topK_threshold = 0.0;
+        int first_topK_move_id = -1;
+        int top_k_moves_real_size = k;
+
+        this->_selectTopKMoves(moves, top_k_moves, k, numCities, distances, new_solution, tabu_array, delta_cummulative_since_last_best); // selects top k moves, if some moves are not applicabke their delta is set to DBL_MAX
+        for (int i = 0; i < k; i++){
+            if (top_k_moves[i].delta == DBL_MAX){
+                top_k_moves_real_size = i + 1;
+                break;
+            }
+        }
+
+        topK_threshold = top_k_moves[k - 1].delta;
+        bool recalculate_deltas_top_k_moves = false;
         while(iter_noimprovement < stop_noimprovement){
-            // select best move from neighbours using aspiration criteria
-            best_delta = 0.0;
+            first_topK_move_id +=1;
+            the_counter ++;
+            best_delta = DBL_MAX;
             best_i = -1;
             best_k = -1;
             select_least_in_tabu = false;
-            this->_selectBestMove(numCities, distances, new_solution, best_delta, best_i, best_k, tabu_array, delta_cummulative_since_last_best);
+
+            if (recalculate_deltas_top_k_moves){
+                // recalculate deltas bestween first id and size - 1
+                for (int i = first_topK_move_id; i < top_k_moves_real_size; i++){
+                    top_k_moves[i].delta = this->_get_delta_edge_exchange_move(new_solution, distances, top_k_moves[i].i, top_k_moves[i].k);
+                }
+                // sort elements from least delta to greatest (between first id and size - 1 ) including both sides
+                std::sort(top_k_moves + first_topK_move_id, top_k_moves + top_k_moves_real_size, [](const Move& lhs, const Move& rhs) {
+                    return lhs.delta < rhs.delta;
+                });
+            }
+            if (top_k_moves[first_topK_move_id].delta > topK_threshold || first_topK_move_id == top_k_moves_real_size){
+                // get top k moves again, calculate threshold and size
+                top_k_moves = this->_selectTopKMoves(moves, top_k_moves, k, numCities, distances, new_solution, tabu_array, delta_cummulative_since_last_best); // selects top k moves, if some moves are not applicabke their delta is set to DBL_MAX
+                for (int i = 0; i < k; i++){
+                    if (top_k_moves[i].delta == DBL_MAX){
+                        top_k_moves_real_size = i + 1;
+                        break;
+                    }
+                }
+                topK_threshold = top_k_moves[k - 1].delta;
+                first_topK_move_id = 0;
+                recalculate_deltas_top_k_moves = true;
+            }
+            best_delta = top_k_moves[first_topK_move_id].delta;
+            best_i = top_k_moves[first_topK_move_id].i;
+            best_k = top_k_moves[first_topK_move_id].k;
+            if (best_delta == DBL_MAX){  // we could implement boolean variable in Move structure to check whether move is applicable or not
+                best_i = -1;
+                best_k = -1;
+            }
+            // this->_selectBestMove(numCities, distances, new_solution, best_delta, best_i, best_k, tabu_array, delta_cummulative_since_last_best);
+
             if (best_i == -1){
                 select_least_in_tabu = true;  // aspiration criteria to select least in tabu if no non-tabu move is found
             }
@@ -749,6 +898,7 @@ public:
             next_tabu_size = -1;
             
             this->_update_tabu_array_edge_exchange(select_least_in_tabu, tabu_array, numCities, tabu_tenure, distances, new_solution, best_delta, best_i, best_k, prev_tabu_size, next_tabu_size);
+            // above line id best_delta was DBL_MAX it will select least in taub. (uodates both best_delta, best_i and best_k)
 
             inverse_order_of_subarray(new_solution, best_i, best_k);
             delta_cummulative_since_last_best += best_delta;
@@ -1030,17 +1180,22 @@ void experiment_tabu_search(int *sol, Solution solution_utilities, int numCities
     // array for costs of best solutions
     double *tabu_costs = new double[number_of_iterations];
 
+    int k = numCities / 10; // should be numCities / 10;
+    Move* moves = new Move[numCities * (numCities - 3) / 2];
+    Move* top_k_moves = new Move[k];
     // perform tabu search algorithm number_of_iterations time
     for (int i = 0; i < number_of_iterations; i++)
     {
         solution_utilities.makeRandom(sol, numCities);
-        tabu_solutions[i] = algorithm_functions.tabuSearchAlgorithm(sol, distances, numCities, iterations_no_improvement_to_stop);
+        tabu_solutions[i] = algorithm_functions.tabuSearchAlgorithm(moves, top_k_moves, k, sol, distances, numCities, iterations_no_improvement_to_stop);
         tabu_costs[i] = solution_utilities.getCost(tabu_solutions[i], distances, numCities);
     }
     // print average, min and max cost
     print_avg_min_max_cost(tabu_costs, number_of_iterations);
     // save to file
     solution_utilities.saveToFile("solution_tabu_" + instance_name + ".txt", tabu_solutions, tabu_costs, numCities);
+    delete[] moves;
+    delete[] top_k_moves;
     delete[] tabu_solutions;
     delete[] tabu_costs;
     cout << endl;
@@ -1050,7 +1205,7 @@ void experiment_tabu_search(int *sol, Solution solution_utilities, int numCities
 void experiment_10times_each()
 {
     string instances[8] = {"ch130", "ch150", "eil101", "kroA100", "kroC100", "kroD100", "lin105", "pr76"};
-    // string instances[1] = {"ch150"};
+    // string instances[1] = {"pr76"};
     string fileName;
     string instance_name;
     Problem problem;
